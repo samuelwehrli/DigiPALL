@@ -1,38 +1,57 @@
-# A streamlit ap which askes several question following the following logic:
 import streamlit as st
 import pandas as pd
 from tools import corsano, loaders, jsonbin
 from tools.digipall import DigiPall
 
-
-# ------------------ Initialize session state & chat ------------------
-if 'patient_id' not in st.session_state:
-    query_params = st.experimental_get_query_params()
-    st.session_state['patient_id'] = query_params.get('id', [''])[0]
-
-if 'corsano' not in st.session_state:
-    secrets = st.secrets.get(st.session_state['patient_id'])
-    st.session_state['corsano'] = loaders.corsano_load(secrets['email'], secrets['password'])
-
-# initialize jsonbin
-api_key = st.secrets['jsonbin']['api_key']
-bin_id = st.secrets[st.session_state['patient_id']]['bin_id']
-bin_api = jsonbin.BinAPI(api_key, bin_id)
-
-if 'digipall' not in st.session_state:
-    api_key = st.secrets['jsonbin']['api_key']
-    bin_id = st.secrets[st.session_state['patient_id']]['bin_id']
-    st.session_state['digipall'] = bin_api.read()
-
-# ------------------ Display app header ------------------
 st.set_page_config(page_title='DigiPALL',page_icon='icon.png')
 st.title('DigiPall')
 
+# ------------------ check for id, secrets and donwload data ------------------
+patient_id = st.experimental_get_query_params().get('id', [''])[0]
+if 'id' in st.experimental_get_query_params():
+    patient_id = st.experimental_get_query_params()['id'][0]
+else:
+    st.error('No patient id provided')
+    st.stop()
+
+if patient_id in st.secrets:
+    patient_secrets = st.secrets[patient_id]
+else:
+    st.error('Patient id not known')
+    st.stop()
+
+for key in ['email', 'password', 'bin_id']:
+    if key not in patient_secrets:
+        st.error(f'Missing patient secrets')
+        st.stop()
+
+if 'jsonbin' not in st.secrets:
+    st.error(f'Missing jsonbin secrets')
+    st.stop()
+elif 'api_key' not in st.secrets['jsonbin']:
+    st.error(f'Missing jsonbin api key')
+    st.stop()
+else:
+    jsonbin_api_key = st.secrets['jsonbin']['api_key']
+
+# initialize jsonbin
+bin_api = jsonbin.BinAPI(jsonbin_api_key, patient_secrets['bin_id'])
+
+# initialize digipall on first start of the app
+if 'digipall' not in st.session_state:
+    st.session_state['digipall'] = bin_api.read()
+
+# donwlodad data from corsano on first start of the app
+if 'corsano' not in st.session_state:
+    st.session_state['corsano'] = loaders.corsano_load(patient_secrets['email'], patient_secrets['password'])
+
+# show status of corsano data
 if st.session_state['corsano']['success']:
     st.success(f"Corsano: {st.session_state['corsano']['status']}")
 else:
     st.error(f"Corsano: {st.session_state['corsano']['status']}")
 
+# ------------------ Initiate tabs ------------------
 
 # make several tabs
 chat_tab, history_tab, vips_tab, decision_tree_tab = st.tabs(['Chat', 'Chat history', 'Vital signs', 'Decision tree'])
@@ -82,7 +101,7 @@ with vips_tab:
         st.bar_chart(x='date', y='total_steps', data=activity_df, use_container_width=True)
 
         st.subheader('Heart Rate')
-        cols = ['avg_daily_heart_rate','max_daily_heart_rate','rest_daily_heart_rate']
+        cols = ['avg_daily_heart_rate', 'max_daily_heart_rate','rest_daily_heart_rate']
         st.line_chart(hr_df.set_index('date')[cols])
 
 
