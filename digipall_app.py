@@ -4,7 +4,7 @@ from tools import corsano, loaders, jsonbin
 from tools.digipall import DigiPall
 
 st.set_page_config(page_title='DigiPALL',page_icon='icon.png')
-st.title('DigiPall')
+st.title('DigiPALL')
 
 # ------------------ check for id, secrets and donwload data ------------------
 patient_id = st.experimental_get_query_params().get('id', [''])[0]
